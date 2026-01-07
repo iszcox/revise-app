@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { useNotesStore } from '../stores/notes';
-import { Search, FileText, ChevronRight } from 'lucide-vue-next';
+import { Search, FileText, ChevronRight, Trash2 } from 'lucide-vue-next';
 import { useRouter } from 'vue-router';
 import TopBar from '../components/TopBar.vue';
 
@@ -17,6 +17,13 @@ const filteredNotes = computed(() => {
 
 const openNote = (id: string) => {
   router.push(`/note/${id}`);
+};
+
+const deleteNote = async (id: string, event: Event) => {
+  event.stopPropagation(); // Prevent opening the note
+  if (confirm('Delete this note?')) {
+    await store.deleteNote(id);
+  }
 };
 </script>
 
@@ -44,24 +51,29 @@ const openNote = (id: string) => {
           v-for="note in filteredNotes" 
           :key="note.id" 
           @click="openNote(note.id)"
-          class="group bg-white p-4 rounded-2xl shadow-sm border border-slate-200 hover:shadow-md hover:border-blue-200 active:scale-[0.99] transition-all cursor-pointer flex items-start gap-4"
+          class="group bg-white p-4 rounded-2xl shadow-sm border border-slate-200 hover:shadow-md hover:border-blue-200 active:scale-[0.99] transition-all cursor-pointer flex items-start gap-4 relative"
         >
           <div class="bg-blue-50 text-blue-500 p-3 rounded-xl group-hover:bg-blue-100 transition-colors">
             <FileText :size="20" />
           </div>
           
-          <div class="flex-1 min-w-0">
+          <div class="flex-1 min-w-0 pr-6">
             <h3 class="font-bold text-slate-800 truncate group-hover:text-blue-700 transition-colors">{{ note.title }}</h3>
             <p class="text-xs text-slate-500 mt-1 line-clamp-2 leading-relaxed">
               {{ note.content.substring(0, 120).replace(/[#*_`]/g, '') }}...
             </p>
-            <div class="flex items-center gap-2 mt-2">
-               <span class="text-[10px] font-medium text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">Medical</span>
-            </div>
           </div>
 
-          <div class="self-center text-slate-300 group-hover:text-blue-400 group-hover:translate-x-1 transition-all">
-            <ChevronRight :size="20" />
+          <button 
+            @click="deleteNote(note.id, $event)"
+            class="absolute top-2 right-2 p-1.5 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-full transition-all z-10"
+            aria-label="Delete note"
+          >
+            <Trash2 :size="16" />
+          </button>
+
+          <div class="absolute right-3 top-1/2 -translate-y-1/2 flex items-center pointer-events-none">
+            <ChevronRight :size="18" class="text-slate-200" />
           </div>
         </div>
         

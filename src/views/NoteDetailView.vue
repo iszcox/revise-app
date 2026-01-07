@@ -4,9 +4,10 @@ import { computed, ref, onMounted, watch, nextTick } from 'vue';
 import { useRoute } from 'vue-router';
 import { useNotesStore } from '../stores/notes';
 import { marked } from 'marked';
-import { Search, Highlighter, X, ChevronDown, ChevronUp } from 'lucide-vue-next';
+import { Search, Highlighter, X, ChevronDown, ChevronUp, Trash2 } from 'lucide-vue-next';
 import TopBar from '../components/TopBar.vue';
 import Mark from 'mark.js';
+import { useRouter } from 'vue-router';
 
 interface ColorOption {
   name: string;
@@ -15,10 +16,19 @@ interface ColorOption {
 }
 
 const route = useRoute();
+const router = useRouter();
 const store = useNotesStore();
 
 const noteId = route.params.id as string;
 const note = computed(() => store.notes.find(n => n.id === noteId));
+
+// Delete Logic
+const confirmDelete = async () => {
+  if (confirm('Are you sure you want to delete this note? This action cannot be undone.')) {
+    await store.deleteNote(noteId);
+    router.push('/library');
+  }
+};
 
 // Search feature
 const showSearch = ref(false);
@@ -168,6 +178,13 @@ watch(showSearch, (val) => {
             :class="showHighlighter ? 'bg-blue-100 text-blue-600' : 'text-slate-500 hover:bg-slate-100'"
           >
             <Highlighter :size="20" />
+          </button>
+          <button 
+            @click="confirmDelete" 
+            class="p-2 rounded-full text-rose-500 hover:bg-rose-50 transition-colors"
+            title="Delete Note"
+          >
+            <Trash2 :size="20" />
           </button>
        </template>
     </TopBar>

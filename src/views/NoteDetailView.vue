@@ -1,4 +1,5 @@
 <script setup lang="ts">
+
 import { computed, ref, onMounted, watch, nextTick } from 'vue';
 import { useRoute } from 'vue-router';
 import { useNotesStore } from '../stores/notes';

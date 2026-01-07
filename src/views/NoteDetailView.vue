@@ -1,11 +1,18 @@
 <script setup lang="ts">
-import { computed, ref, onMounted, onUnmounted, watch, nextTick } from 'vue';
+
+import { computed, ref, onMounted, watch, nextTick } from 'vue';
 import { useRoute } from 'vue-router';
 import { useNotesStore } from '../stores/notes';
 import { marked } from 'marked';
 import { Search, Highlighter, X, ChevronDown, ChevronUp } from 'lucide-vue-next';
 import TopBar from '../components/TopBar.vue';
 import Mark from 'mark.js';
+
+interface ColorOption {
+  name: string;
+  class: string;
+  hex: string;
+}
 
 const route = useRoute();
 const store = useNotesStore();
@@ -22,14 +29,14 @@ const totalResults = ref(0);
 
 // Highlighting feature
 const showHighlighter = ref(false);
-const colors = [
+const colors: ColorOption[] = [
   { name: 'Yellow', class: 'hl-yellow', hex: '#fef08a' },
   { name: 'Green', class: 'hl-green', hex: '#bbf7d0' },
   { name: 'Blue', class: 'hl-blue', hex: '#bfdbfe' },
   { name: 'Pink', class: 'hl-pink', hex: '#fbcfe8' },
   { name: 'Purple', class: 'hl-purple', hex: '#e9d5ff' },
 ];
-const selectedColor = ref(colors[0]);
+const selectedColor = ref<ColorOption>(colors[0]!);
 
 const renderedContent = computed(() => {
   if (!note.value) return '';
@@ -90,7 +97,7 @@ const prevResult = () => {
 
 // Highlighting Logic
 const applyHighlight = () => {
-  if (!showHighlighter.value) return;
+  if (!showHighlighter.value || !selectedColor.value) return;
   
   const selection = window.getSelection();
   if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return;
@@ -125,7 +132,7 @@ const handleContentClick = (e: MouseEvent) => {
 
 onMounted(async () => {
   await nextTick();
-  const content = document.querySelector('.note-content');
+  const content = document.querySelector('.note-content') as HTMLElement | null;
   if (content) {
     searchInstance.value = new Mark(content);
   }
@@ -201,7 +208,7 @@ watch(showSearch, (val) => {
               @click="selectedColor = color"
               class="w-10 h-10 rounded-full border-2 transition-transform active:scale-90"
               :style="{ backgroundColor: color.hex }"
-              :class="selectedColor.name === color.name ? 'border-slate-800 scale-110 shadow-md' : 'border-transparent'"
+              :class="selectedColor && selectedColor.name === color.name ? 'border-slate-800 scale-110 shadow-md' : 'border-transparent'"
             ></button>
          </div>
          <p class="text-[10px] text-center text-slate-500 font-medium px-4">Long-press text to select a sentence, then tap "Apply" below.</p>

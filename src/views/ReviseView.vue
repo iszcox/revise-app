@@ -1,139 +1,181 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue';
-import { useNotesStore } from '../stores/notes';
-import { marked } from 'marked';
-import { Shuffle, Eye, RotateCw } from 'lucide-vue-next';
+import { computed, onMounted, ref } from 'vue';
+import { useLessonsStore } from '../stores/lessons';
 import TopBar from '../components/TopBar.vue';
+import { SkipForward, Clock, BookOpen, AlertCircle, TrendingUp, ThumbsUp, CheckCircle } from 'lucide-vue-next';
+import type { Lesson } from '../types';
 
-const store = useNotesStore();
-const currentNoteId = ref<string | null>(null);
-const isRevealed = ref(false);
+const store = useLessonsStore();
+const currentLesson = ref<Lesson | null>(null);
+const selectedRating = ref<number>(1); // Default to 1 or current proficiency
 
-const currentNote = computed(() => {
-  if (!currentNoteId.value) return null;
-  return store.notes.find(n => n.id === currentNoteId.value);
-});
+const queue = computed(() => store.suggestions);
 
-const renderedContent = computed(() => {
-  if (!currentNote.value) return '';
-  return marked(currentNote.value.content);
-});
-
-const pickRandom = () => {
-  if (store.notes.length === 0) return;
-  const ids = store.notes.map(n => n.id);
-  
-  let nextId = ids[Math.floor(Math.random() * ids.length)];
-  if (ids.length > 1 && nextId === currentNoteId.value) {
-      let attempts = 0;
-      while (nextId === currentNoteId.value && attempts < 5) {
-         nextId = ids[Math.floor(Math.random() * ids.length)];
-         attempts++;
-      }
-  }
-  if (nextId) {
-      currentNoteId.value = nextId;
-      isRevealed.value = false;
-      // Scroll to top
-      const contentArea = document.getElementById('revision-content');
-      if (contentArea) contentArea.scrollTop = 0;
-  }
+const loadNext = () => {
+    if (store.lessons.length === 0) {
+        currentLesson.value = null;
+        return;
+    }
+    // Pick the top one from the weighted queue
+    const next = queue.value[0];
+    if (next) {
+        currentLesson.value = next;
+        selectedRating.value = next.proficiency || 1;
+    }
 };
 
-watch(() => store.notes.length, (newVal) => {
-  if (newVal > 0 && !currentNoteId.value) {
-    pickRandom();
-  }
+const selectRating = (rating: number) => {
+    selectedRating.value = rating;
+};
+
+const completeRevision = async () => {
+    if (!currentLesson.value) return;
+    await store.markAsRevised(currentLesson.value.id, selectedRating.value);
+    loadNext();
+};
+
+const skip = () => {
+    if (queue.value.length <= 1) return;
+    const candidates = queue.value.slice(1, 4);
+    const random = candidates[Math.floor(Math.random() * candidates.length)];
+    if (random) {
+        currentLesson.value = random;
+        selectedRating.value = random.proficiency || 1;
+    }
+};
+
+onMounted(async () => {
+    await store.loadLessons();
+    loadNext();
 });
 
-onMounted(() => {
-  if (!currentNoteId.value && store.notes.length > 0) {
-    pickRandom();
-  }
-});
+const formatDate = (ts: number | null) => {
+    if (!ts) return 'Never';
+    const days = Math.floor((Date.now() - ts) / (1000 * 60 * 60 * 24));
+    if (days === 0) return 'Today';
+    if (days === 1) return 'Yesterday';
+    return `${days} days ago`;
+};
+
+// Helper for UI current proficiency
+const getProficiencyLabel = (p: number) => {
+    if (p <= 1) return { text: 'Hard', color: 'text-rose-500', bg: 'bg-rose-50' };
+    if (p === 2) return { text: 'Medium', color: 'text-amber-500', bg: 'bg-amber-50' };
+    return { text: 'Easy', color: 'text-emerald-500', bg: 'bg-emerald-50' };
+};
 </script>
 
 <template>
   <div class="page-wrapper h-screen flex flex-col">
-    <TopBar title="Flashcard Mode">
-       <template #actions>
-          <button @click="pickRandom" class="text-blue-600 font-medium text-sm bg-blue-50 px-3 py-1.5 rounded-full hover:bg-blue-100 transition-colors">Skip</button>
-       </template>
-    </TopBar>
+    <TopBar title="Focus Mode" />
 
-    <div class="flex-1 flex flex-col pt-14 pb-24 bg-slate-100 overflow-hidden">
-      <div v-if="currentNote" class="flex-1 p-5 flex flex-col overflow-hidden">
-        <!-- Card Container -->
-        <div class="flex-1 bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-200 flex flex-col relative overflow-hidden transition-all duration-500">
-          
-          <!-- Question / Header Side -->
-          <div class="p-6 border-b border-slate-100 bg-gradient-to-br from-white to-slate-50">
-            <div class="flex items-center justify-between mb-2">
-              <span class="text-[11px] uppercase tracking-widest font-bold text-blue-500 bg-blue-50 px-2 py-1 rounded-md">Topic</span>
-              <span class="text-slate-300 text-xs">#{{ currentNoteId?.substring(0,4) }}</span>
-            </div>
-            <h2 class="text-2xl font-bold text-slate-800 leading-tight">{{ currentNote.title }}</h2>
-          </div>
-          
-          <!-- Answer / Content Side -->
-          <div id="revision-content" class="flex-1 relative overflow-y-auto custom-scrollbar">
-            <!-- Blur Overlay -->
-            <div 
-              class="absolute inset-0 flex flex-col items-center justify-center bg-white/80 backdrop-blur-xl z-20 transition-all duration-500 p-8 text-center"
-              :class="{ 'opacity-0 pointer-events-none': isRevealed }"
-            >
-               <div class="bg-white p-4 rounded-full shadow-lg mb-4">
-                 <Eye :size="32" class="text-blue-500" />
-               </div>
-               <h3 class="font-bold text-slate-800 text-lg mb-2">Recall Phase</h3>
-               <p class="text-slate-500 text-sm mb-6 leading-relaxed">Take a moment to mentally review the key points of this topic before revealing.</p>
-               <button 
-                 @click="isRevealed = true" 
-                 class="bg-slate-900 text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-slate-200 hover:scale-105 active:scale-95 transition-all w-full max-w-xs"
-               >
-                 Reveal Answer
-               </button>
-            </div>
-            
-            <div class="p-6 prose prose-slate max-w-none prose-p:text-slate-600 prose-headings:text-slate-800 prose-li:text-slate-600 prose-strong:text-slate-800">
-              <div v-html="renderedContent"></div>
-            </div>
-          </div>
+    <div class="flex-1 flex flex-col p-6 pb-24 max-w-md mx-auto w-full justify-center">
+        
+        <div v-if="currentLesson" class="bg-white rounded-3xl shadow-xl shadow-blue-200/50 border border-blue-50 p-8 flex flex-col items-center text-center relative overflow-hidden transition-all duration-500">
+             <!-- Background Decoration -->
+             <div class="absolute -top-10 -right-10 w-32 h-32 bg-blue-50 rounded-full blur-2xl"></div>
+             <div class="absolute -bottom-10 -left-10 w-32 h-32 bg-indigo-50 rounded-full blur-2xl"></div>
+
+             <div class="relative z-10 w-full flex flex-col items-center">
+                 <div class="bg-blue-100 text-blue-600 p-4 rounded-2xl mb-4 shadow-inner">
+                    <BookOpen :size="32" />
+                 </div>
+                 
+                 <h2 class="text-2xl font-bold text-slate-800 mb-2 leading-tight">{{ currentLesson.title }}</h2>
+                 
+                 <div class="flex items-center gap-3 mb-8">
+                     <span class="text-xs font-bold px-2 py-1 rounded-md bg-slate-100 text-slate-500 flex items-center gap-1">
+                        <Clock :size="12" />
+                        {{ formatDate(currentLesson.lastRevised) }}
+                     </span>
+                     <span 
+                        class="text-xs font-bold px-2 py-1 rounded-md flex items-center gap-1"
+                        :class="[getProficiencyLabel(currentLesson.proficiency || 1).bg, getProficiencyLabel(currentLesson.proficiency || 1).color]"
+                     >
+                        <TrendingUp :size="12" />
+                        {{ getProficiencyLabel(currentLesson.proficiency || 1).text }}
+                     </span>
+                 </div>
+
+                 <div v-if="currentLesson.note" class="bg-slate-50 p-4 rounded-xl border border-slate-100 w-full mb-8 text-left max-h-48 overflow-y-auto custom-scrollbar">
+                    <span class="text-[10px] uppercase font-bold text-slate-400 block mb-2 tracking-wider">Notes</span>
+                    <p class="text-slate-600 text-sm leading-relaxed whitespace-pre-wrap">{{ currentLesson.note }}</p>
+                 </div>
+                 <div v-else class="mb-8 p-4 text-slate-400 italic text-sm">
+                    No notes for this course.
+                 </div>
+
+                 <div class="w-full">
+                    <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Rate your knowledge</p>
+                    <div class="grid grid-cols-3 gap-3 mb-6">
+                        <button 
+                            @click="selectRating(1)"
+                            class="flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all"
+                            :class="selectedRating === 1 ? 'border-rose-500 bg-rose-50 text-rose-600 shadow-md scale-105' : 'border-slate-100 text-slate-400 hover:border-rose-200 hover:text-rose-400'"
+                        >
+                            <AlertCircle :size="24" class="mb-1" />
+                            <span class="text-xs font-bold">Hard</span>
+                        </button>
+                        
+                        <button 
+                            @click="selectRating(2)"
+                            class="flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all"
+                            :class="selectedRating === 2 ? 'border-amber-500 bg-amber-50 text-amber-600 shadow-md scale-105' : 'border-slate-100 text-slate-400 hover:border-amber-200 hover:text-amber-400'"
+                        >
+                            <TrendingUp :size="24" class="mb-1" />
+                            <span class="text-xs font-bold">Okay</span>
+                        </button>
+
+                        <button 
+                            @click="selectRating(3)"
+                            class="flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all"
+                            :class="selectedRating === 3 ? 'border-emerald-500 bg-emerald-50 text-emerald-600 shadow-md scale-105' : 'border-slate-100 text-slate-400 hover:border-emerald-200 hover:text-emerald-400'"
+                        >
+                            <ThumbsUp :size="24" class="mb-1" />
+                            <span class="text-xs font-bold">Easy</span>
+                        </button>
+                    </div>
+
+                    <button 
+                         @click="completeRevision"
+                         class="w-full bg-slate-900 text-white py-3.5 rounded-xl font-bold shadow-lg shadow-slate-200 hover:bg-slate-800 active:scale-[0.98] transition-all flex items-center justify-center gap-2 mb-3"
+                    >
+                        <CheckCircle :size="20" class="text-emerald-400" />
+                        Mark Revised & Next
+                    </button>
+
+                    <button 
+                        @click="skip"
+                        class="text-slate-400 font-medium py-2 rounded-xl hover:text-slate-600 transition-colors flex items-center justify-center gap-2 text-xs"
+                    >
+                        <SkipForward :size="14" />
+                        Skip for now
+                    </button>
+                 </div>
+             </div>
         </div>
-      </div>
 
-      <!-- Empty State -->
-      <div v-else class="flex-1 flex flex-col items-center justify-center p-6 text-center space-y-4">
-        <div class="bg-slate-200 p-6 rounded-full animate-pulse">
-          <RotateCw :size="40" class="text-slate-400" />
+        <div v-else-if="store.lessons.length === 0" class="text-center text-slate-400">
+            <p>No lessons to revise.</p>
         </div>
-        <p class="text-slate-400 font-medium">Loading your revision stack...</p>
-      </div>
-
-      <!-- Bottom Action -->
-      <div class="px-5 pb-2 pt-0 flex justify-center">
-        <button 
-          @click="pickRandom" 
-          class="w-full max-w-md bg-blue-600 text-white p-4 rounded-2xl font-bold text-lg shadow-xl shadow-blue-200 hover:bg-blue-700 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
-          :disabled="store.notes.length === 0"
-        >
-          <Shuffle :size="24" />
-          {{ currentNote ? 'Next Topic' : 'Start Revising' }}
-        </button>
-      </div>
+        
+        <div v-else class="text-center">
+            <h3 class="font-bold text-slate-800 text-xl">All caught up!</h3>
+            <p class="text-slate-500 mt-2">Great job revising your list.</p>
+        </div>
     </div>
   </div>
 </template>
 
 <style scoped>
 .custom-scrollbar::-webkit-scrollbar {
-  width: 6px;
+  width: 4px;
 }
 .custom-scrollbar::-webkit-scrollbar-track {
   background: transparent;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb {
   background-color: #cbd5e1;
-  border-radius: 20px;
+  border-radius: 10px;
 }
 </style>

@@ -37,12 +37,14 @@ const goBack = () => {
           <ChevronLeft :size="24" />
         </button>
         
-        <h1 
-          v-if="title" 
-          class="font-bold text-lg text-slate-800 truncate"
-        >
-          {{ title }}
-        </h1>
+        <slot name="title">
+          <h1 
+            v-if="title" 
+            class="font-bold text-lg text-slate-800 truncate"
+          >
+            {{ title }}
+          </h1>
+        </slot>
       </div>
       
       <div class="flex items-center gap-2">

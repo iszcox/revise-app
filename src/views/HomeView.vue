@@ -1,58 +1,83 @@
 <script setup lang="ts">
-import { useNotesStore } from '../stores/notes';
-import NoteImporter from '../components/NoteImporter.vue';
+import { computed, onMounted } from 'vue';
+import { useLessonsStore } from '../stores/lessons';
+import LessonAdder from '../components/LessonAdder.vue';
 import TopBar from '../components/TopBar.vue';
-import { computed } from 'vue';
+import { Clock, AlertCircle, ChevronRight } from 'lucide-vue-next';
+import { useRouter } from 'vue-router';
 
-const store = useNotesStore();
-const noteCount = computed(() => store.notes.length);
+const store = useLessonsStore();
+const router = useRouter();
+
+onMounted(() => {
+  store.loadLessons();
+});
+
+const suggestions = computed(() => store.suggestions.slice(0, 3));
+const hasSuggestions = computed(() => suggestions.value.length > 0);
+
+const formatTime = (ts: number | null) => {
+  if (!ts) return 'Never revised';
+  const date = new Date(ts);
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+};
+
+const openLesson = (id: string) => {
+  router.push(`/lesson/${id}`);
+};
 </script>
 
 <template>
-  <div class="page-wrapper">
+  <div class="page-wrapper pb-24">
     <TopBar title="Dashboard" />
 
     <div class="p-5 space-y-8 max-w-md mx-auto animate-in fade-in duration-500">
-      <!-- Welcome Section -->
+      
+      <!-- Welcome -->
       <section>
-        <h2 class="text-2xl font-bold text-slate-800 tracking-tight">Good Afternoon,</h2>
-        <p class="text-slate-500 font-medium">Ready to revise your notes?</p>
+        <h2 class="text-2xl font-bold text-slate-800 tracking-tight">Time to Revise?</h2>
+        <p class="text-slate-500 font-medium">Add new courses or review old ones.</p>
       </section>
 
-      <!-- Stats Cards -->
-      <div class="grid grid-cols-2 gap-4">
-        <div class="relative group overflow-hidden bg-gradient-to-br from-blue-600 to-blue-500 text-white p-5 rounded-2xl shadow-lg shadow-blue-200 transition-transform active:scale-[0.98]">
-          <div class="absolute top-0 right-0 p-3 opacity-10">
-            <svg width="60" height="60" fill="currentColor" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"></path></svg>
-          </div>
-          <span class="text-blue-100 text-sm font-semibold tracking-wide uppercase">Library</span>
-          <div class="mt-4 flex items-baseline gap-1">
-            <span class="text-4xl font-bold">{{ noteCount }}</span>
-            <span class="text-blue-100 text-sm">notes</span>
-          </div>
-        </div>
-
-        <div class="relative group overflow-hidden bg-white border border-slate-100 p-5 rounded-2xl shadow-lg shadow-slate-100 transition-transform active:scale-[0.98]">
-          <span class="text-slate-400 text-sm font-semibold tracking-wide uppercase">Status</span>
-          <div class="mt-4">
-            <span class="text-2xl font-bold text-emerald-500 flex items-center gap-2">
-              <span class="relative flex h-3 w-3">
-                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span class="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
-              </span>
-              Active
-            </span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Actions -->
-      <section class="space-y-4">
-        <div class="flex items-center justify-between">
-          <h3 class="text-lg font-bold text-slate-800">Quick Actions</h3>
-        </div>
-        <NoteImporter />
+      <!-- Add New -->
+      <section>
+        <LessonAdder />
       </section>
+
+      <!-- Suggestions -->
+      <section v-if="hasSuggestions">
+         <div class="flex items-center justify-between mb-4">
+            <h3 class="font-bold text-slate-800 flex items-center gap-2">
+              <AlertCircle :size="18" class="text-amber-500" />
+              Needs Revision
+            </h3>
+            <router-link to="/revise" class="text-xs font-bold text-blue-600 hover:text-blue-700 bg-blue-50 px-2 py-1 rounded-md">Start Session</router-link>
+         </div>
+
+         <div class="space-y-3">
+            <div 
+              v-for="lesson in suggestions" 
+              :key="lesson.id"
+              @click="openLesson(lesson.id)"
+              class="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex items-center justify-between group active:scale-[0.99] transition-all cursor-pointer hover:border-blue-200"
+            >
+               <div>
+                  <h4 class="font-bold text-slate-700 group-hover:text-blue-600 transition-colors">{{ lesson.title }}</h4>
+                  <div class="flex items-center gap-1 text-xs text-slate-400 mt-1">
+                     <Clock :size="12" />
+                     <span>Last: {{ formatTime(lesson.lastRevised) }}</span>
+                  </div>
+               </div>
+               <ChevronRight :size="18" class="text-slate-300" />
+            </div>
+         </div>
+      </section>
+
+      <!-- Empty State -->
+      <section v-else class="text-center py-10 opacity-60">
+        <p class="text-sm text-slate-400">No lessons added yet.</p>
+      </section>
+
     </div>
   </div>
 </template>

@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { onMounted } from 'vue';
-import { useNotesStore } from './stores/notes';
+import { useLessonsStore } from './stores/lessons';
 import NavBar from './components/NavBar.vue';
 
-const store = useNotesStore();
+const store = useLessonsStore();
 
 onMounted(() => {
-  store.loadNotes();
+  store.loadLessons();
 });
 </script>
 

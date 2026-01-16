@@ -1,6 +1,7 @@
 # Revise - Medical Notes PWA
 
 A modern, offline-first application for young doctors to revise their personal notes.
+They can mark it and juge the difficulty.
 
 ## Features
 - **Import**: Easily import `.txt` and `.md` notes.
